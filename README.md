@@ -40,4 +40,14 @@ aws_secret_access_key = YOUR_SECRET_KEY
 
 # Installation
 
-TODO
+1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system (look for `darwin` if you're using a mac, `linux` for a linux machine).
+
+2) Move the binary somewhere in your PATH
+
+`mv ~/Downloads/redyl-0.1.0-darwin-amd64 /usr/local/bin/redyl`
+
+3) Set the executable bit
+
+`chmod +x /usr/local/bin/redyl`
+
+4) `redyl` should now work, try `redyl version`
