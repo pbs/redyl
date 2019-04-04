@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	iam "github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -83,7 +84,8 @@ func deleteCurrentIamKey(client *iam.IAM) {
 	}
 }
 
-// RotateAccessKeys ensures that the user has a single, new IAM access key
+// RotateAccessKeys ensures uses the default profile to get new access keys for the
+// default_original profile. In the process, it deletes the current default_original access key
 func RotateAccessKeys() string {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -107,6 +109,7 @@ func RotateAccessKeys() string {
 // UpdateSessionKeys uses the default_original profile to get new session keys
 // for the default profile
 func UpdateSessionKeys() string {
+	cfg := readCredentialsFile()
 	var tokenCode string
 	fmt.Print("Please enter mfa code: ")
 	fmt.Scanln(&tokenCode)
@@ -124,9 +127,18 @@ func UpdateSessionKeys() string {
 		DurationSeconds: &sessionLifespan,
 	})
 	if err != nil {
-		log.Fatal(err)
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "InvalidClientTokenId":
+				accessKey := cfg.Section("default_original").Key("aws_access_key_id").String()
+				log.Fatal("check your security credentials at https://console.aws.amazon.com/iam/home to ensure that access key ", accessKey, " is active")
+			default:
+				log.Fatal(err)
+			}
+		} else {
+			log.Fatal(err)
+		}
 	}
-	cfg := readCredentialsFile()
 
 	cfg.Section("default").Key("aws_access_key_id").SetValue(*output.Credentials.AccessKeyId)
 	cfg.Section("default").Key("aws_secret_access_key").SetValue(*output.Credentials.SecretAccessKey)
