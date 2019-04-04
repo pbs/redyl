@@ -22,6 +22,21 @@ func getHomeDirectory() string {
 	return usr.HomeDir
 }
 
+func readConfigFile() *ini.File {
+	homeDirectory := getHomeDirectory()
+	configPath := filepath.Join(homeDirectory, ".aws", "config")
+	_, err := os.Stat(configPath)
+	if err != nil {
+		log.Fatal("No file found at", configPath)
+	}
+	cfg, err := ini.Load(configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return cfg
+}
+
 func readCredentialsFile() *ini.File {
 	homeDirectory := getHomeDirectory()
 	credentialsPath := filepath.Join(homeDirectory, ".aws", "credentials")
@@ -46,13 +61,7 @@ func writeCredentialsFile(cfg *ini.File) string {
 }
 
 func getMfaSerialNumber() string {
-	homeDirectory := getHomeDirectory()
-	credentialsPath := filepath.Join(homeDirectory, ".aws", "config")
-	_, err := os.Stat(credentialsPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg, err := ini.Load(credentialsPath)
+	cfg := readConfigFile()
 
 	return cfg.Section("default").Key("mfa_serial").String()
 }
