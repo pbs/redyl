@@ -3,31 +3,29 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
 
+	"github.com/pbs/redyl/internal/redyl/io"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
+var myLog = log.New(os.Stderr, "app: ", log.LstdFlags|log.Lshortfile)
+
 var region string
+var profile string
 
 var rootCmd = &cobra.Command{
 	Use:   "redyl",
 	Short: "authenticate to AWS CLI with multi-factor auth",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("hello world")
-		// Do Stuff Here
-	},
-}
-
-func init() {
-	rootCmd.PersistentFlags().StringVarP(&region, "region", "r", "us-east-1", "AWS region")
-	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
-	viper.SetDefault("region", "us-east-1")
-}
+		io.UpdateSessionKeys()
+		location := io.RotateAccessKeys()
+		fmt.Println("Credentials written to", location)
+	}}
 
 // Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		myLog.Fatal(err)
 	}
 }
