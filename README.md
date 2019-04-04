@@ -40,7 +40,7 @@ aws_secret_access_key = YOUR_SECRET_KEY
 
 # Installation
 
-1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system (look for `darwin` if you're using a mac, `linux` for a linux machine).
+1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system (look for `darwin` if you're using a mac, `linux` or `windows` otherwise).
 
 2) Move the binary somewhere in your PATH
 
