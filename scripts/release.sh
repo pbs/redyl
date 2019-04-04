@@ -20,7 +20,7 @@ docker build -t redyl_builder -f Dockerfile.build.alpine .
 >&2 echo "compiling binaries for release"
 # for each of our target platforms we use the redyl_builder
 #   docker container to compile a binary of our application
-for platform in darwin linux; do \
+for platform in darwin linux windows; do \
     binary_name="redyl-${VERSION}-${platform}-amd64"
     >&2 echo "compiling $binary_name"
 
