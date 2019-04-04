@@ -21,8 +21,7 @@ func getHomeDirectory() string {
 	return usr.HomeDir
 }
 
-// ReadCredentialsFile reads the current users's ~/.aws/credentials file
-func ReadCredentialsFile() *ini.File {
+func readCredentialsFile() *ini.File {
 	homeDirectory := getHomeDirectory()
 	credentialsPath := filepath.Join(homeDirectory, ".aws", "credentials")
 	_, err := os.Stat(credentialsPath)
@@ -37,7 +36,6 @@ func ReadCredentialsFile() *ini.File {
 	return cfg
 }
 
-// writeCredentialsFile writes to the current users's ~/.aws/credentials file
 func writeCredentialsFile(cfg *ini.File) string {
 	homeDirectory := getHomeDirectory()
 	credentialsPath := filepath.Join(homeDirectory, ".aws", "credentials")
@@ -65,7 +63,7 @@ func deleteCurrentIamKey(client *iam.IAM) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := ReadCredentialsFile()
+	cfg := readCredentialsFile()
 	usedKey := cfg.Section("default_original").Key("aws_access_key_id").String()
 	if usedKey == "" {
 		log.Fatal("failed to fetch aws_access_key_id from default_original section in ~/.aws/credentials")
@@ -75,7 +73,6 @@ func deleteCurrentIamKey(client *iam.IAM) {
 		if candidate != usedKey {
 			continue
 		}
-		// TODO prompt for user input here?
 		fmt.Println("deleting IAM key", candidate)
 		_, err := client.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 			AccessKeyId: &candidate,
@@ -98,12 +95,11 @@ func RotateAccessKeys() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := ReadCredentialsFile()
+	cfg := readCredentialsFile()
 	fmt.Println("new IAM key is ", *newKeyOutput.AccessKey.AccessKeyId)
 	cfg.Section("default_original").Key("aws_access_key_id").SetValue(*newKeyOutput.AccessKey.AccessKeyId)
 	cfg.Section("default_original").Key("aws_secret_access_key").SetValue(*newKeyOutput.AccessKey.SecretAccessKey)
 	location := writeCredentialsFile(cfg)
-	// deleteUnusedIamKey(client)
 
 	return location
 }
@@ -130,7 +126,7 @@ func UpdateSessionKeys() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := ReadCredentialsFile()
+	cfg := readCredentialsFile()
 
 	cfg.Section("default").Key("aws_access_key_id").SetValue(*output.Credentials.AccessKeyId)
 	cfg.Section("default").Key("aws_secret_access_key").SetValue(*output.Credentials.SecretAccessKey)
