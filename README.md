@@ -30,7 +30,7 @@ mfa_serial = arn:aws:iam::account_number:mfa/username
 ```
 
 ```
-$ cat ~/.aws/config
+$ cat ~/.aws/credentials
 
 # use default_original here, not default - redyl will write temporary credentials to default
 [default_original]
