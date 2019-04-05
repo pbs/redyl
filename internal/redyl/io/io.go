@@ -22,14 +22,14 @@ func getHomeDirectory() string {
 	return usr.HomeDir
 }
 
-func readConfigFile() *ini.File {
+func readAWSIniFile(filename string) *ini.File {
 	homeDirectory := getHomeDirectory()
-	configPath := filepath.Join(homeDirectory, ".aws", "config")
-	_, err := os.Stat(configPath)
+	location := filepath.Join(homeDirectory, ".aws", filename)
+	_, err := os.Stat(location)
 	if err != nil {
-		log.Fatal("No file found at", configPath)
+		log.Fatal("No file found at", location)
 	}
-	cfg, err := ini.Load(configPath)
+	cfg, err := ini.Load(location)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,53 +37,58 @@ func readConfigFile() *ini.File {
 	return cfg
 }
 
-func readCredentialsFile() *ini.File {
+func writeAWSIniFile(filename string, cfg *ini.File) string {
 	homeDirectory := getHomeDirectory()
-	credentialsPath := filepath.Join(homeDirectory, ".aws", "credentials")
-	_, err := os.Stat(credentialsPath)
-	if err != nil {
-		log.Fatal("No file found at", credentialsPath)
-	}
-	cfg, err := ini.Load(credentialsPath)
-	if err != nil {
-		log.Fatal(err)
-	}
+	location := filepath.Join(homeDirectory, ".aws", filename)
+	cfg.SaveTo(location)
 
-	return cfg
+	return location
 }
 
-func writeCredentialsFile(cfg *ini.File) string {
-	homeDirectory := getHomeDirectory()
-	credentialsPath := filepath.Join(homeDirectory, ".aws", "credentials")
-	cfg.SaveTo(credentialsPath)
+func updateCredentials(section string, parameters map[string]string) string {
+	cfg := readAWSIniFile("credentials")
+	for k, v := range parameters {
+		cfg.Section(section).Key(k).SetValue(v)
+	}
+	location := writeAWSIniFile("credentials", cfg)
 
-	return credentialsPath
+	return location
 }
 
 func getMfaSerialNumber() string {
-	cfg := readConfigFile()
+	cfg := readAWSIniFile("config")
 
 	return cfg.Section("default").Key("mfa_serial").String()
 }
 
-func deleteCurrentIamKey(client *iam.IAM) {
+func getCurrentIamKey() string {
+	cfg := readAWSIniFile("credentials")
+	key := cfg.Section("default_original").Key("aws_access_key_id").String()
+	if key == "" {
+		log.Fatal("failed to fetch aws_access_key_id from default_original section in ~/.aws/credentials")
+	}
+	return key
+}
+
+func deleteCurrentIamKey() {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Profile:           "default",
+	}))
+	client := iam.New(sess)
 	output, err := client.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: nil,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := readCredentialsFile()
-	usedKey := cfg.Section("default_original").Key("aws_access_key_id").String()
-	if usedKey == "" {
-		log.Fatal("failed to fetch aws_access_key_id from default_original section in ~/.aws/credentials")
-	}
+
+	usedKey := getCurrentIamKey()
 	for index := 0; index < len(output.AccessKeyMetadata); index++ {
 		candidate := *output.AccessKeyMetadata[index].AccessKeyId
 		if candidate != usedKey {
 			continue
 		}
-		fmt.Println("deleting IAM key", candidate)
 		_, err := client.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 			AccessKeyId: &candidate,
 		})
@@ -93,41 +98,22 @@ func deleteCurrentIamKey(client *iam.IAM) {
 	}
 }
 
-// RotateAccessKeys ensures uses the default profile to get new access keys for the
-// default_original profile. In the process, it deletes the current default_original access key
-func RotateAccessKeys() string {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Profile:           "default",
-	}))
-	client := iam.New(sess)
-	deleteCurrentIamKey(client)
-	newKeyOutput, err := client.CreateAccessKey(&iam.CreateAccessKeyInput{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg := readCredentialsFile()
-	fmt.Println("new IAM key is ", *newKeyOutput.AccessKey.AccessKeyId)
-	cfg.Section("default_original").Key("aws_access_key_id").SetValue(*newKeyOutput.AccessKey.AccessKeyId)
-	cfg.Section("default_original").Key("aws_secret_access_key").SetValue(*newKeyOutput.AccessKey.SecretAccessKey)
-	location := writeCredentialsFile(cfg)
-
-	return location
-}
-
-// UpdateSessionKeys uses the default_original profile to get new session keys
-// for the default profile
-func UpdateSessionKeys() string {
-	cfg := readCredentialsFile()
+func getTokenCode() string {
 	var tokenCode string
 	fmt.Print("Please enter mfa code: ")
 	fmt.Scanln(&tokenCode)
+
+	return tokenCode
+}
+
+func getSessionKeys(profile string) map[string]string {
+	tokenCode := getTokenCode()
 	serialNumber := getMfaSerialNumber()
 	sessionLifespan := int64(60 * 60 * 36)
 
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
-		Profile:           "default_original",
+		Profile:           profile,
 	}))
 	client := sts.New(sess)
 	output, err := client.GetSessionToken(&sts.GetSessionTokenInput{
@@ -135,11 +121,12 @@ func UpdateSessionKeys() string {
 		TokenCode:       &tokenCode,
 		DurationSeconds: &sessionLifespan,
 	})
+	cfg := readAWSIniFile("credentials")
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "InvalidClientTokenId":
-				accessKey := cfg.Section("default_original").Key("aws_access_key_id").String()
+				accessKey := cfg.Section(profile).Key("aws_access_key_id").String()
 				log.Fatal("check your security credentials at https://console.aws.amazon.com/iam/home to ensure that access key ", accessKey, " is active")
 			default:
 				log.Fatal(err)
@@ -149,9 +136,45 @@ func UpdateSessionKeys() string {
 		}
 	}
 
-	cfg.Section("default").Key("aws_access_key_id").SetValue(*output.Credentials.AccessKeyId)
-	cfg.Section("default").Key("aws_secret_access_key").SetValue(*output.Credentials.SecretAccessKey)
-	cfg.Section("default").Key("aws_session_token").SetValue(*output.Credentials.SessionToken)
-	location := writeCredentialsFile(cfg)
+	params := make(map[string]string)
+	params["aws_access_key_id"] = *output.Credentials.AccessKeyId
+	params["aws_secret_access_key"] = *output.Credentials.SecretAccessKey
+	params["aws_session_token"] = *output.Credentials.SessionToken
+	return params
+}
+
+func getNewIamKey(profile string) map[string]string {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Profile:           profile,
+	}))
+	client := iam.New(sess)
+	newKeyOutput, err := client.CreateAccessKey(&iam.CreateAccessKeyInput{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	params := make(map[string]string)
+	params["aws_access_key_id"] = *newKeyOutput.AccessKey.AccessKeyId
+	params["aws_secret_access_key"] = *newKeyOutput.AccessKey.SecretAccessKey
+
+	return params
+}
+
+// UpdateSessionKeys uses the default_original profile to get new session keys
+// for the default profile
+func UpdateSessionKeys() string {
+	params := getSessionKeys("default_original")
+	location := updateCredentials("default", params)
+
+	return location
+}
+
+// RotateAccessKeys uses the default profile to get new access keys for the
+// default_original profile. In the process, it deletes the current default_original access key
+func RotateAccessKeys() string {
+	deleteCurrentIamKey()
+	params := getNewIamKey("default")
+	location := updateCredentials("default_original", params)
+
 	return location
 }
