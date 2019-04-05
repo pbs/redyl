@@ -17,19 +17,36 @@ func getFakeHomeDirectory() string {
 
 func getFakeSessionKeys(p string, t string, s string) map[string]string {
 	params := make(map[string]string)
-	params["aws_access_key_id"] = "fake_key"
-	params["aws_secret_access_key"] = "fake_secret_key"
+	params["aws_access_key_id"] = "fake_session_key"
+	params["aws_secret_access_key"] = "fake_session_secret_key"
 	params["aws_session_token"] = "fake_session_token"
 	return params
 }
 
-func TestUpdateSessionKeys(t *testing.T) {
+func fakeDeleteIamKey(a string, b string) {}
+
+func fakeGetNewIamKey(a string) map[string]string {
+	params := make(map[string]string)
+	params["aws_access_key_id"] = "fake_iam_key"
+	params["aws_secret_access_key"] = "fake_iam_secret_key"
+	return params
+}
+
+func TestEndToEnd(t *testing.T) {
+	// TODO test that mock AWS functions are getting called with correct
+	// arguments
 	updater := SessionKeyUpdater{
 		getTokenCode:     getFakeTokenCode,
 		getHomeDirectory: getFakeHomeDirectory,
 		getSessionKeys:   getFakeSessionKeys,
 	}
-	location := updater.update()
+	rotator := AccessKeyRotator{
+		getHomeDirectory: getFakeHomeDirectory,
+		deleteIamKey:     fakeDeleteIamKey,
+		createIamKey:     fakeGetNewIamKey,
+	}
+	updater.update()
+	location := rotator.rotate()
 	actualContent, err := ioutil.ReadFile(location)
 	if err != nil {
 		panic(err)
