@@ -15,6 +15,12 @@ import (
 )
 
 func getAWSSession(profile string) *session.Session {
+	vars := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
+	for _, v := range vars {
+		if os.Getenv(v) != "" {
+			log.Fatal("please unset the environment variable ", v)
+		}
+	}
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 		Profile:           profile,
