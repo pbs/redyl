@@ -91,6 +91,23 @@ func (s SessionKeyUpdater) update() string {
 	return location
 }
 
+// AccessKeyRotator updates session keys
+type AccessKeyRotator struct {
+	getHomeDirectory func() string
+	deleteIamKey     func(string, string)
+	createIamKey     func(string) map[string]string
+}
+
+func (a AccessKeyRotator) rotate() string {
+	home := a.getHomeDirectory()
+	key := getCurrentIamKey("default_original", home)
+	a.deleteIamKey("default_original", key)
+	params := a.createIamKey("default")
+	location := updateCredentials("default_original", params, home)
+
+	return location
+}
+
 // UpdateSessionKeys uses the default_original profile to get new session keys
 // for the default profile
 func UpdateSessionKeys() string {
@@ -106,11 +123,12 @@ func UpdateSessionKeys() string {
 // RotateAccessKeys uses the default profile to get new access keys for the
 // default_original profile. In the process, it deletes the current default_original access key
 func RotateAccessKeys() string {
-	home := getUserHomeDirectory()
-	key := getCurrentIamKey("default_original", home)
-	aws.DeleteIamKey("default_original", key)
-	params := aws.GetNewIamKey("default")
-	location := updateCredentials("default_original", params, home)
+	rotator := AccessKeyRotator{
+		getHomeDirectory: getUserHomeDirectory,
+		deleteIamKey:     aws.DeleteIamKey,
+		createIamKey:     aws.GetNewIamKey,
+	}
+	location := rotator.rotate()
 
 	return location
 }
