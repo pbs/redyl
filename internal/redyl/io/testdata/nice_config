@@ -1,0 +1,3 @@
+[default]
+region = us-east-1
+mfa_serial = arn:aws:iam::fake:mfa/user
