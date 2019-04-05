@@ -14,6 +14,15 @@ import (
 	ini "gopkg.in/ini.v1"
 )
 
+func getAWSSession(profile string) *session.Session {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Profile:           profile,
+	}))
+
+	return sess
+}
+
 func getHomeDirectory() string {
 	usr, err := user.Current()
 	if err != nil {
@@ -55,26 +64,23 @@ func updateCredentials(section string, parameters map[string]string) string {
 	return location
 }
 
-func getMfaSerialNumber() string {
+func getMfaSerialNumber(profile string) string {
 	cfg := readAWSIniFile("config")
 
-	return cfg.Section("default").Key("mfa_serial").String()
+	return cfg.Section(profile).Key("mfa_serial").String()
 }
 
-func getCurrentIamKey() string {
+func getCurrentIamKey(profile string) string {
 	cfg := readAWSIniFile("credentials")
-	key := cfg.Section("default_original").Key("aws_access_key_id").String()
+	key := cfg.Section(profile).Key("aws_access_key_id").String()
 	if key == "" {
-		log.Fatal("failed to fetch aws_access_key_id from default_original section in ~/.aws/credentials")
+		log.Fatal("failed to fetch aws_access_key_id from ", profile, "section in ~/.aws/credentials")
 	}
 	return key
 }
 
-func deleteCurrentIamKey() {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Profile:           "default",
-	}))
+func deleteCurrentIamKey(profileToChange string, profileToUse string) {
+	sess := getAWSSession(profileToUse)
 	client := iam.New(sess)
 	output, err := client.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: nil,
@@ -83,7 +89,7 @@ func deleteCurrentIamKey() {
 		log.Fatal(err)
 	}
 
-	usedKey := getCurrentIamKey()
+	usedKey := getCurrentIamKey(profileToChange)
 	for index := 0; index < len(output.AccessKeyMetadata); index++ {
 		candidate := *output.AccessKeyMetadata[index].AccessKeyId
 		if candidate != usedKey {
@@ -108,13 +114,9 @@ func getTokenCode() string {
 
 func getSessionKeys(profile string) map[string]string {
 	tokenCode := getTokenCode()
-	serialNumber := getMfaSerialNumber()
+	serialNumber := getMfaSerialNumber("default")
 	sessionLifespan := int64(60 * 60 * 36)
-
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Profile:           profile,
-	}))
+	sess := getAWSSession(profile)
 	client := sts.New(sess)
 	output, err := client.GetSessionToken(&sts.GetSessionTokenInput{
 		SerialNumber:    &serialNumber,
@@ -144,10 +146,7 @@ func getSessionKeys(profile string) map[string]string {
 }
 
 func getNewIamKey(profile string) map[string]string {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Profile:           profile,
-	}))
+	sess := getAWSSession(profile)
 	client := iam.New(sess)
 	newKeyOutput, err := client.CreateAccessKey(&iam.CreateAccessKeyInput{})
 	if err != nil {
@@ -172,7 +171,7 @@ func UpdateSessionKeys() string {
 // RotateAccessKeys uses the default profile to get new access keys for the
 // default_original profile. In the process, it deletes the current default_original access key
 func RotateAccessKeys() string {
-	deleteCurrentIamKey()
+	deleteCurrentIamKey("default_original", "default")
 	params := getNewIamKey("default")
 	location := updateCredentials("default_original", params)
 
