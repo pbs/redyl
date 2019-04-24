@@ -38,6 +38,33 @@ aws_access_key_id     = YOUR_ACCESS_KEY
 aws_secret_access_key = YOUR_SECRET_KEY
 ```
 
+# Named profiles
+
+If you'd like to use a named profile instead of `default`, use the `profile` argument. Let's say you're using a named profile called "operations"
+
+```
+redyl --profile=operations
+```
+
+This should work fine as long as you have sections like this in your config and credentials:
+
+```
+$ cat ~/.aws/config
+
+[operations]
+region = us-east-1
+mfa_serial = arn:aws:iam::account_number:mfa/username
+
+```
+
+```
+$ cat ~/.aws/credentials
+
+[operations_original]
+aws_access_key_id     = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+```
+
 # Installation
 
 1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system (look for `darwin` if you're using a mac, `linux` or `windows` otherwise).
