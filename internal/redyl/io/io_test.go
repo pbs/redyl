@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+var fakeHome = filepath.Join("/", "tmp", "redyl", "io_test", ".aws")
+
 func getFakeTokenCode() string {
 	return "fake"
 }
@@ -32,33 +34,55 @@ func fakeGetNewIamKey(a string) map[string]string {
 	return params
 }
 
+type TestInput struct {
+	config      string
+	credentials string
+	profile     string
+}
+
+var testtable = []struct {
+	in     TestInput
+	target string
+}{
+	{TestInput{config: "testdata/default_config", credentials: "testdata/default_credentials", profile: "default"}, "testdata/default_target"},
+	{TestInput{config: "testdata/named_config", credentials: "testdata/named_credentials", profile: "named"}, "testdata/named_target"},
+}
+
+
 func TestEndToEnd(t *testing.T) {
-	// TODO test that mock AWS functions are getting called with correct
-	// arguments
-	updater := SessionKeyUpdater{
-		getTokenCode:     getFakeTokenCode,
-		getHomeDirectory: getFakeHomeDirectory,
-		getSessionKeys:   getFakeSessionKeys,
-	}
-	rotator := AccessKeyRotator{
-		getHomeDirectory: getFakeHomeDirectory,
-		deleteIamKey:     fakeDeleteIamKey,
-		createIamKey:     fakeGetNewIamKey,
-	}
-	updater.update()
-	location := rotator.rotate()
-	actualContent, err := ioutil.ReadFile(location)
-	if err != nil {
-		panic(err)
-	}
-	targetContent, err := ioutil.ReadFile("testdata/target_credentials")
-	if err != nil {
-		panic(err)
-	}
-	actual := string(actualContent)
-	target := string(targetContent)
-	if actual != target {
-		t.Error("Expected ", target, ", got ", actual)
+	for _, tt := range testtable {
+		t.Run(tt.in.profile, func(t *testing.T) {
+			copyFile(tt.in.credentials, filepath.Join(fakeHome, "credentials"))
+			copyFile(tt.in.config, filepath.Join(fakeHome, "config"))
+			// TODO test that mock AWS functions are getting called with correct
+			// arguments
+			updater := SessionKeyUpdater{
+				getTokenCode:     getFakeTokenCode,
+				getHomeDirectory: getFakeHomeDirectory,
+				getSessionKeys:   getFakeSessionKeys,
+			}
+			rotator := AccessKeyRotator{
+				getHomeDirectory: getFakeHomeDirectory,
+				deleteIamKey:     fakeDeleteIamKey,
+				createIamKey:     fakeGetNewIamKey,
+			}
+			updater.update(tt.in.profile)
+			location := rotator.rotate(tt.in.profile)
+			actualContent, err := ioutil.ReadFile(location)
+			if err != nil {
+				panic(err)
+			}
+			targetContent, err := ioutil.ReadFile(tt.target)
+			if err != nil {
+				panic(err)
+			}
+			actual := string(actualContent)
+			target := string(targetContent)
+			if actual != target {
+				t.Error("Expected ", target, ", got ", actual)
+			}
+
+		})
 	}
 }
 
@@ -75,11 +99,8 @@ func copyFile(infile string, outfile string) {
 }
 
 func TestMain(m *testing.M) {
-	fakeHome := filepath.Join("/", "tmp", "redyl", "io_test", ".aws")
 	os.RemoveAll(fakeHome)
 	os.MkdirAll(fakeHome, os.ModePerm)
-	copyFile("testdata/nice_credentials", filepath.Join(fakeHome, "credentials"))
-	copyFile("testdata/nice_config", filepath.Join(fakeHome, "config"))
 	outCode := m.Run()
 	os.RemoveAll(fakeHome)
 	os.Exit(outCode)

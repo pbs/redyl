@@ -53,8 +53,12 @@ func updateCredentials(section string, parameters map[string]string, home string
 
 func getMfaSerialNumber(profile string, home string) string {
 	config := readAWSIniFile("config", home)
+	val := config.Section(profile).Key("mfa_serial").String()
+	if val == "" {
+		log.Fatal("failed to fetch mfa_serial from ", profile, "section in ~/.aws/config")
+	}
 
-	return config.Section(profile).Key("mfa_serial").String()
+	return val
 }
 
 func getCurrentIamKey(profile string, home string) string {
@@ -81,12 +85,15 @@ type SessionKeyUpdater struct {
 	getSessionKeys   func(string, string, string) map[string]string
 }
 
-func (s SessionKeyUpdater) update() string {
+func (s SessionKeyUpdater) update(profile string) string {
 	home := s.getHomeDirectory()
 	token := s.getTokenCode()
-	serial := getMfaSerialNumber("default", home)
-	params := s.getSessionKeys("default_original", token, serial)
-	location := updateCredentials("default", params, home)
+	serial := getMfaSerialNumber(profile, home)
+	params := s.getSessionKeys(profile+"_original", token, serial)
+	location := updateCredentials(profile, params, home)
+	if profile != "default" {
+		location = updateCredentials("default", params, home)
+	}
 
 	return location
 }
@@ -98,37 +105,38 @@ type AccessKeyRotator struct {
 	createIamKey     func(string) map[string]string
 }
 
-func (a AccessKeyRotator) rotate() string {
+func (a AccessKeyRotator) rotate(profile string) string {
 	home := a.getHomeDirectory()
-	key := getCurrentIamKey("default_original", home)
-	a.deleteIamKey("default_original", key)
-	params := a.createIamKey("default")
-	location := updateCredentials("default_original", params, home)
+	profileOriginal := profile + "_original"
+	key := getCurrentIamKey(profileOriginal, home)
+	a.deleteIamKey(profileOriginal, key)
+	params := a.createIamKey(profile)
+	location := updateCredentials(profileOriginal, params, home)
 
 	return location
 }
 
-// UpdateSessionKeys uses the default_original profile to get new session keys
-// for the default profile
-func UpdateSessionKeys() string {
+// UpdateSessionKeys uses the original profile to get new session keys
+// for the profile
+func UpdateSessionKeys(profile string) string {
 	updater := SessionKeyUpdater{
 		getTokenCode:     getTokenCodeFromMfa,
 		getHomeDirectory: getUserHomeDirectory,
 		getSessionKeys:   aws.GetSessionKeys,
 	}
-	location := updater.update()
+	location := updater.update(profile)
 	return location
 }
 
-// RotateAccessKeys uses the default profile to get new access keys for the
-// default_original profile. In the process, it deletes the current default_original access key
-func RotateAccessKeys() string {
+// RotateAccessKeys uses the profile to get new access keys for the
+// original profile. In the process, it deletes the current original access key
+func RotateAccessKeys(profile string) string {
 	rotator := AccessKeyRotator{
 		getHomeDirectory: getUserHomeDirectory,
 		deleteIamKey:     aws.DeleteIamKey,
 		createIamKey:     aws.GetNewIamKey,
 	}
-	location := rotator.rotate()
+	location := rotator.rotate(profile)
 
 	return location
 }
