@@ -48,7 +48,6 @@ var testtable = []struct {
 	{TestInput{config: "testdata/named_config", credentials: "testdata/named_credentials", profile: "named"}, "testdata/named_target"},
 }
 
-
 func TestEndToEnd(t *testing.T) {
 	for _, tt := range testtable {
 		t.Run(tt.in.profile, func(t *testing.T) {
