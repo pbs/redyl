@@ -109,7 +109,7 @@ func (a AccessKeyRotator) rotate(profile string) string {
 	home := a.getHomeDirectory()
 	profileOriginal := profile + "_original"
 	key := getCurrentIamKey(profileOriginal, home)
-	a.deleteIamKey(profileOriginal, key)
+	a.deleteIamKey(profile, key)
 	params := a.createIamKey(profile)
 	location := updateCredentials(profileOriginal, params, home)
 
