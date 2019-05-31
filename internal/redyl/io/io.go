@@ -65,7 +65,7 @@ func getCurrentIamKey(profile string, home string) string {
 	creds := readAWSIniFile("credentials", home)
 	key := creds.Section(profile).Key("aws_access_key_id").String()
 	if key == "" {
-		log.Fatal("failed to fetch aws_access_key_id from ", profile, "section in ~/.aws/credentials")
+		log.Fatal("failed to fetch aws_access_key_id from ", profile, " section in ~/.aws/credentials")
 	}
 	return key
 }
@@ -98,7 +98,7 @@ func (s SessionKeyUpdater) update(profile string) string {
 	return location
 }
 
-// AccessKeyRotator updates session keys
+// AccessKeyRotator updates access keys
 type AccessKeyRotator struct {
 	getHomeDirectory func() string
 	deleteIamKey     func(string, string)
