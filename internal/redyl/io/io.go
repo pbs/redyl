@@ -55,7 +55,7 @@ func getMfaSerialNumber(profile string, home string) string {
 	config := readAWSIniFile("config", home)
 	val := config.Section(profile).Key("mfa_serial").String()
 	if val == "" {
-		log.Fatal("failed to fetch mfa_serial from ", profile, "section in ~/.aws/config")
+		log.Fatal("failed to fetch mfa_serial from ", profile, " section in ~/.aws/config")
 	}
 
 	return val
