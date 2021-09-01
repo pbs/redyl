@@ -91,9 +91,6 @@ func (s SessionKeyUpdater) update(profile string) string {
 	serial := getMfaSerialNumber(profile, home)
 	params := s.getSessionKeys(profile+"_original", token, serial)
 	location := updateCredentials(profile, params, home)
-	if profile != "default" {
-		location = updateCredentials("default", params, home)
-	}
 
 	return location
 }

@@ -12,8 +12,3 @@ aws_access_key_id     = fake_session_key
 aws_secret_access_key = fake_session_secret_key
 aws_session_token     = fake_session_token
 
-[default]
-aws_access_key_id     = fake_session_key
-aws_secret_access_key = fake_session_secret_key
-aws_session_token     = fake_session_token
-
