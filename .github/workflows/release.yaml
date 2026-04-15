@@ -24,7 +24,7 @@ jobs:
 
   build:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -44,7 +44,18 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           binary_name="redyl-${{ needs.release-please.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
-          go build -o "bin/${binary_name}" .
+          mkdir -p bin
+          if [ "$GOOS" = "windows" ]; then
+            go build \
+              -ldflags "-X github.com/pbs/redyl/internal/redyl/version.Version=${{ needs.release-please.outputs.version }}" \
+              -o "bin/${binary_name}.exe" .
+            zip -j "bin/${binary_name}.zip" "bin/${binary_name}.exe"
+            rm "bin/${binary_name}.exe"
+          else
+            go build \
+              -ldflags "-X github.com/pbs/redyl/internal/redyl/version.Version=${{ needs.release-please.outputs.version }}" \
+              -o "bin/${binary_name}" .
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -54,7 +65,7 @@ jobs:
 
   upload-assets:
     needs: [release-please, build]
-    if: ${{ needs.release-please.outputs.release_created }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -69,5 +80,6 @@ jobs:
         run: |
           for file in bin/*; do
             gh release upload "${{ needs.release-please.outputs.tag_name }}" "$file" \
-              --repo "${{ github.repository }}"
+              --repo "${{ github.repository }}" \
+              --clobber
           done
