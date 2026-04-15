@@ -50,8 +50,8 @@ var testtable = []struct {
 func TestEndToEnd(t *testing.T) {
 	for _, tt := range testtable {
 		t.Run(tt.in.profile, func(t *testing.T) {
-			copyFile(tt.in.credentials, filepath.Join(fakeHome, "credentials"))
-			copyFile(tt.in.config, filepath.Join(fakeHome, "config"))
+			copyFile(t, tt.in.credentials, filepath.Join(fakeHome, "credentials"))
+			copyFile(t, tt.in.config, filepath.Join(fakeHome, "config"))
 			// TODO test that mock AWS functions are getting called with correct
 			// arguments
 			updater := SessionKeyUpdater{
@@ -68,11 +68,11 @@ func TestEndToEnd(t *testing.T) {
 			location := rotator.rotate(tt.in.profile)
 			actualContent, err := os.ReadFile(location)
 			if err != nil {
-				panic(err)
+				t.Fatal(err)
 			}
 			targetContent, err := os.ReadFile(tt.target)
 			if err != nil {
-				panic(err)
+				t.Fatal(err)
 			}
 			actual := string(actualContent)
 			target := string(targetContent)
@@ -84,15 +84,16 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
-func copyFile(infile string, outfile string) {
+func copyFile(t *testing.T, infile string, outfile string) {
+	t.Helper()
 	b, err := os.ReadFile(infile)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	err = os.WriteFile(outfile, b, 0644)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 }
 
