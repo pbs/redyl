@@ -67,11 +67,14 @@ aws_secret_access_key = YOUR_SECRET_KEY
 
 # Installation
 
-1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system (look for `darwin` if you're using a mac, `linux` or `windows` otherwise).
+1) Find the latest release on https://github.com/pbs/redyl/releases and download the binary for your system:
+   - macOS: `darwin-arm64` (Apple Silicon) or `darwin-amd64` (Intel)
+   - Linux: `linux-amd64` or `linux-arm64`
+   - Windows: `windows-amd64` or `windows-arm64`
 
 2) Move the binary somewhere in your PATH
 
-`mv ~/Downloads/redyl-0.1.0-darwin-amd64 /usr/local/bin/redyl`
+`mv ~/Downloads/redyl-1.1.0-darwin-arm64 /usr/local/bin/redyl`
 
 3) Set the executable bit
 

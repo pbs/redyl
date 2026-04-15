@@ -1,7 +1,6 @@
 package io
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,11 +66,11 @@ func TestEndToEnd(t *testing.T) {
 			}
 			updater.update(tt.in.profile)
 			location := rotator.rotate(tt.in.profile)
-			actualContent, err := ioutil.ReadFile(location)
+			actualContent, err := os.ReadFile(location)
 			if err != nil {
 				panic(err)
 			}
-			targetContent, err := ioutil.ReadFile(tt.target)
+			targetContent, err := os.ReadFile(tt.target)
 			if err != nil {
 				panic(err)
 			}
@@ -86,12 +85,12 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func copyFile(infile string, outfile string) {
-	b, err := ioutil.ReadFile(infile)
+	b, err := os.ReadFile(infile)
 	if err != nil {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(outfile, b, 0644)
+	err = os.WriteFile(outfile, b, 0644)
 	if err != nil {
 		panic(err)
 	}
